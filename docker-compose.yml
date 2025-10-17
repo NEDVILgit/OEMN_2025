@@ -1,0 +1,52 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dts-backend
+    ports:
+      - "5001:5001"
+    volumes:
+      # Ambas carpetas deben ser visibles para el postCreateCommand
+      - ./backend:/workspace/backend
+      - ./frontend:/workspace/frontend 
+    environment:
+      - MONGO_URI=mongodb://database:27017/disena_tu_estilo
+      - NODE_ENV=development
+    depends_on:
+      database:
+        condition: service_healthy
+    # Comando final para iniciar el servidor automáticamente
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dts-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/workspace/frontend
+    depends_on:
+      backend:
+        condition: service_started
+    command: npm run dev
+
+  database:
+    image: mongo:latest
+    container_name: dts-database
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mongo-data:
+
