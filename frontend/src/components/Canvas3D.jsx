@@ -3,75 +3,62 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stage, useGLTF, Text, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Texturas Predefinidas ---
+// --- Texturas Predefinidas (sin cambios) ---
 const textureUrls = {
   canvas: 'https://placehold.co/512x512/d1bfa7/8c6d53.png?text=Lona',
   leather: 'https://placehold.co/512x512/8B4513/FFFFFF.png?text=Cuero',
   geometric: 'https://placehold.co/512x512/333333/FFFFFF.png?text=Geo',
 };
 
-// --- Modelo de Mochila Profesional ---
 const Backpack = ({ colors, texture, customText, drawingTexture }) => {
-  // Carga el modelo GLB desde la carpeta /public
-  const { nodes } = useGLTF('/mochila.glb');
+  const { nodes, materials } = useGLTF('/mochila_dior.glb');
   
-  // Carga las texturas predefinidas
+  // (Lógica de texturas y materiales sin cambios)
   const predefinedTextures = useTexture(textureUrls);
-
-  // Memoiza la textura del dibujo del usuario
   const userDrawingTexture = useMemo(() => {
     if (!drawingTexture) return null;
     const loader = new THREE.TextureLoader();
-    return loader.load(drawingTexture, (tex) => {
-      tex.flipY = false;
-      tex.needsUpdate = true;
-    });
+    return loader.load(drawingTexture, (tex) => { tex.flipY = false; tex.needsUpdate = true; });
   }, [drawingTexture]);
-
-  // Determina qué textura aplicar
   const appliedTexture = useMemo(() => {
     if (texture === 'custom' && userDrawingTexture) return userDrawingTexture;
     if (texture !== 'none' && predefinedTextures[texture]) return predefinedTextures[texture];
     return null;
   }, [texture, userDrawingTexture, predefinedTextures]);
-
-  // Crea un solo material que se actualizará con los colores y texturas
-  const sharedMaterial = useMemo(() => new THREE.MeshStandardMaterial({
-    roughness: 0.4,
-    metalness: 0.1,
-  }), []);
-
-  // Aplica las propiedades al material
-  useMemo(() => {
-    sharedMaterial.color.set(appliedTexture ? '#ffffff' : colors.body);
-    sharedMaterial.map = appliedTexture;
-    sharedMaterial.needsUpdate = true;
-  }, [colors.body, appliedTexture, sharedMaterial]);
-
-  // ¡IMPORTANTE! Aquí usamos el nombre que encontramos en la consola.
-  // Es muy probable que sea 'geometry_0'. Si es otro, cámbialo aquí.
-  const mainMesh = nodes.geometry_0;
+  const bodyMaterial = useMemo(() => new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 }), []);
+  const adjustmentStrapsMaterial = useMemo(() => new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 }), []);
+  const loadStrapsMaterial = useMemo(() => new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 }), []);
+  const sidePocketsMaterial = useMemo(() => new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 }), []);
+  useMemo(() => { bodyMaterial.color.set(appliedTexture ? '#ffffff' : colors.body); bodyMaterial.map = appliedTexture; bodyMaterial.needsUpdate = true; }, [colors.body, appliedTexture, bodyMaterial]);
+  useMemo(() => { adjustmentStrapsMaterial.color.set(colors.adjustmentStraps); adjustmentStrapsMaterial.needsUpdate = true; }, [colors.adjustmentStraps, adjustmentStrapsMaterial]);
+  useMemo(() => { loadStrapsMaterial.color.set(colors.loadStraps); loadStrapsMaterial.needsUpdate = true; }, [colors.loadStraps, loadStrapsMaterial]);
+  useMemo(() => { sidePocketsMaterial.color.set(colors.sidePockets); sidePocketsMaterial.needsUpdate = true; }, [colors.sidePockets, sidePocketsMaterial]);
 
   return (
-    <group scale={3.5} position-y={-1.5}>
-      {mainMesh && (
-        <mesh 
-          geometry={mainMesh.geometry}
-          material={sharedMaterial} // Asignamos nuestro material reactivo
-          castShadow 
-          receiveShadow 
-        />
-      )}
-      
-      {/* El texto se mantiene separado */}
+    <group scale={4} position-y={-1.8}>
+      {Object.values(nodes).map((node) => {
+        if (!node.isMesh) return null;
+        let material;
+        switch (node.name) {
+          case 'Pattern': material = bodyMaterial; break;
+          case 'Fabic1': material = adjustmentStrapsMaterial; break;
+          case 'Fabic2': material = loadStrapsMaterial; break;
+          case 'Net_Side': material = sidePocketsMaterial; break;
+          default: material = materials[node.material.name]; break;
+        }
+        return <mesh key={node.uuid} geometry={node.geometry} material={material} castShadow receiveShadow />;
+      })}
+
+      {/* --- Componente de Texto con Posición Corregida y Fuente por Defecto --- */}
       <Text
-        position={[0, -0.2, 0.6]}
-        rotation={[-0.1, 0, 0]}
-        fontSize={customText.size * 0.5}
+        // Se elimina la carga de fuentes externas para garantizar la visibilidad
+        position={[customText.positionX, customText.positionY, 0.52]} // <-- Ligeramente más atrás
+        rotation={[-0.2, 0, 0]}
+        fontSize={customText.size * 0.08}
         color={customText.color}
         anchorX="center"
         anchorY="middle"
-        maxWidth={1.0}
+        maxWidth={0.8}
         textAlign="center"
       >
         {customText.content}
@@ -80,36 +67,34 @@ const Backpack = ({ colors, texture, customText, drawingTexture }) => {
   );
 };
 
-
-// --- Otros modelos sin cambios ---
+// Componentes Bag y MateBag sin cambios
 const Bag = (props) => (
   <group position-y={-0.75}>
-    <mesh castShadow>
+    <mesh castShadow receiveShadow>
       <boxGeometry args={[2.5, 1.5, 0.7]} />
-      <meshStandardMaterial color={props.colors.body} />
+      <meshStandardMaterial color={props.colors.body || '#ffffff'} />
     </mesh>
-    <mesh castShadow position={[0, 0.8, 0]}>
+    <mesh castShadow receiveShadow position={[0, 0.8, 0]}>
       <torusGeometry args={[0.8, 0.05, 16, 100, Math.PI]} />
-      <meshStandardMaterial color={props.colors.straps} />
+      <meshStandardMaterial color={props.colors.loadStraps || '#000000'} />
     </mesh>
   </group>
 );
 const MateBag = (props) => (
    <group position-y={-1}>
-    <mesh castShadow>
+    <mesh castShadow receiveShadow>
       <cylinderGeometry args={[0.8, 0.8, 2, 32]} />
-      <meshStandardMaterial color={props.colors.body} />
+      <meshStandardMaterial color={props.colors.body || '#ffffff'} />
     </mesh>
-    <mesh castShadow position={[0, 1, 0]}>
+    <mesh castShadow receiveShadow position={[0, 1, 0]}>
        <torusGeometry args={[1.2, 0.04, 16, 100]} />
-       <meshStandardMaterial color={props.colors.straps} />
+       <meshStandardMaterial color={props.colors.loadStraps || '#000000'} />
     </mesh>
   </group>
 );
 
 
 export default function Canvas3D({ productType, colors, texture, customText, drawingTexture }) {
-  
   const renderProduct = () => {
     const props = { colors, texture, customText, drawingTexture };
     switch(productType) {
@@ -119,7 +104,6 @@ export default function Canvas3D({ productType, colors, texture, customText, dra
       default: return <Backpack {...props} />;
     }
   }
-
   return (
     <Canvas shadows dpr={[1, 2]} camera={{ fov: 50, position: [0, 0, 5] }}>
       <Suspense fallback={null}>
@@ -131,6 +115,5 @@ export default function Canvas3D({ productType, colors, texture, customText, dra
     </Canvas>
   );
 }
-
-useGLTF.preload('/mochila.glb');
+useGLTF.preload('/mochila_dior.glb');
 
